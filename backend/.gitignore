@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables — KHÔNG được commit
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime
+*.docx
+kill_connections.js
+verify_db.js
+
+# OS
+.DS_Store
+Thumbs.db

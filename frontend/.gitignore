@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# Vite cache
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
