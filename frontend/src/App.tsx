@@ -86,12 +86,22 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'products' | 'kpi'>('overview');
   const [yearFilter, setYearFilter] = useState('all');
+  const [quarterFilter, setQuarterFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('all');
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchTicker(), fetchKpi(), fetchSales(), fetchProducts()])
-      .then(([t, k, s, p]) => { setTicker(t); setKpi(k); setSales(s); setProds(p); })
+    setLoading(true);
+    const params = { year: yearFilter, quarter: quarterFilter, month: monthFilter };
+    Promise.all([fetchTicker(params), fetchKpi(params), fetchSales(params), fetchProducts(params)])
+      .then(([t, k, s, p]) => { 
+        setTicker(t); setKpi(k); setSales(s); setProds(p); 
+        if (yearFilter === 'all' && quarterFilter === 'all' && monthFilter === 'all' && availableYears.length === 0) {
+          setAvailableYears((Array.from(new Set(s.map((r: SalesRow) => String(r.ord_year)))) as string[]).sort());
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [yearFilter, quarterFilter, monthFilter]);
 
   if (loading) return (
     <div className="loading-screen">
@@ -101,8 +111,7 @@ export default function App() {
   );
 
   // ── Sales line chart data ──
-  const years  = [...new Set(sales.map(r => String(r.ord_year)))].sort();
-  const filtered = yearFilter === 'all' ? sales : sales.filter(r => String(r.ord_year) === yearFilter);
+  const filtered = sales; // We removed client side yearFilter since it's global now
   const MONTHS   = ['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'];
 
   const byMonth: Record<string, { s: number; p: number }> = {};
@@ -236,15 +245,34 @@ export default function App() {
             <p>Cập nhật theo thời gian thực từ cơ sở dữ liệu</p>
           </div>
           <div className="topbar-right">
-            {tab === 'overview' && (
-              <>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Năm:</label>
-                <select className="filter-select" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
-                  <option value="all">Tất cả</option>
-                  {years.map(y => <option key={y}>{y}</option>)}
-                </select>
-              </>
-            )}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '16px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Năm:</label>
+              <select className="filter-select" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
+                <option value="all">Tất cả</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Quý:</label>
+              <select className="filter-select" value={quarterFilter} onChange={e => {
+                setQuarterFilter(e.target.value);
+                if (e.target.value !== 'all') setMonthFilter('all'); // Reset month if quarter changed
+              }}>
+                <option value="all">Tất cả</option>
+                <option value="1">Quý 1</option>
+                <option value="2">Quý 2</option>
+                <option value="3">Quý 3</option>
+                <option value="4">Quý 4</option>
+              </select>
+
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tháng:</label>
+              <select className="filter-select" value={monthFilter} onChange={e => {
+                setMonthFilter(e.target.value);
+                if (e.target.value !== 'all') setQuarterFilter('all'); // Reset quarter if month changed
+              }}>
+                <option value="all">Tất cả</option>
+                {MONTHS.map((m, i) => <option key={i+1} value={String(i+1)}>{m}</option>)}
+              </select>
+            </div>
             <div className="topbar-badge">
               <span className="topbar-badge-dot" />
               Kết nối thành công

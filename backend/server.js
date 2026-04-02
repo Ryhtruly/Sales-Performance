@@ -7,6 +7,28 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function buildDateFilter(params) {
+  const { year, quarter, month } = params;
+  const filterParams = [];
+  const filterConditions = [];
+
+  if (year && year !== 'all') {
+    filterParams.push(year);
+    filterConditions.push(`EXTRACT(YEAR FROM o.order_date) = $${filterParams.length}`);
+  }
+  if (quarter && quarter !== 'all') {
+    filterParams.push(quarter);
+    filterConditions.push(`EXTRACT(QUARTER FROM o.order_date) = $${filterParams.length}`);
+  }
+  if (month && month !== 'all') {
+    filterParams.push(month);
+    filterConditions.push(`EXTRACT(MONTH FROM o.order_date) = $${filterParams.length}`);
+  }
+
+  const filterSql = filterConditions.length > 0 ? " AND " + filterConditions.join(" AND ") : "";
+  return { filterSql, filterParams };
+}
+
 const pool = new Pool({
   user: process.env.PG_USER,
   password: process.env.PG_PASSWORD,
@@ -18,6 +40,7 @@ const pool = new Pool({
 // 1. KPI Overview: Profit Margin & Avg Delivery Days by Segment
 app.get('/api/kpi', async (req, res) => {
   try {
+    const { filterSql, filterParams } = buildDateFilter(req.query);
     const kpiQuery = `
       SELECT 
         c.segment, 
@@ -29,11 +52,11 @@ app.get('/api/kpi', async (req, res) => {
       FROM orders o
       JOIN order_details od ON o.order_id = od.order_id
       JOIN customers c ON o.customer_id = c.customer_id
-      WHERE o.ship_date IS NOT NULL AND o.order_date IS NOT NULL
+      WHERE o.ship_date IS NOT NULL AND o.order_date IS NOT NULL ${filterSql}
       GROUP BY c.segment
       ORDER BY total_sales DESC;
     `;
-    const result = await pool.query(kpiQuery);
+    const result = await pool.query(kpiQuery, filterParams);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -44,6 +67,7 @@ app.get('/api/kpi', async (req, res) => {
 // 2. Sales & Profit over Time & Market
 app.get('/api/sales', async (req, res) => {
   try {
+    const { filterSql, filterParams } = buildDateFilter(req.query);
     const salesQuery = `
       SELECT 
         EXTRACT(YEAR FROM o.order_date) as ord_year,
@@ -54,11 +78,11 @@ app.get('/api/sales', async (req, res) => {
       FROM orders o
       JOIN order_details od ON o.order_id = od.order_id
       JOIN locations l ON o.location_id = l.location_id
-      WHERE o.order_date IS NOT NULL
+      WHERE o.order_date IS NOT NULL ${filterSql}
       GROUP BY ord_year, ord_month, l.market
       ORDER BY ord_year, ord_month;
     `;
-    const result = await pool.query(salesQuery);
+    const result = await pool.query(salesQuery, filterParams);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -69,6 +93,7 @@ app.get('/api/sales', async (req, res) => {
 // 3. Product Performance: Discount vs Profit by Category
 app.get('/api/products', async (req, res) => {
   try {
+    const { filterSql, filterParams } = buildDateFilter(req.query);
     const prodQuery = `
       SELECT 
         cat.category_name,
@@ -78,10 +103,12 @@ app.get('/api/products', async (req, res) => {
       FROM order_details od
       JOIN products p ON od.product_id = p.product_id
       JOIN categories cat ON p.category_id = cat.category_id
+      JOIN orders o ON od.order_id = o.order_id
+      WHERE o.order_date IS NOT NULL ${filterSql}
       GROUP BY cat.category_name
       ORDER BY total_profit DESC;
     `;
-    const result = await pool.query(prodQuery);
+    const result = await pool.query(prodQuery, filterParams);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -92,6 +119,7 @@ app.get('/api/products', async (req, res) => {
 // 4. Overall Ticker KPIs
 app.get('/api/ticker', async (req, res) => {
   try {
+    const { filterSql, filterParams } = buildDateFilter(req.query);
     const tickerQuery = `
       SELECT 
         SUM(od.sales) as gross_sales,
@@ -100,10 +128,10 @@ app.get('/api/ticker', async (req, res) => {
         SUM(od.shipping_cost) as total_shipping
       FROM orders o
       JOIN order_details od ON o.order_id = od.order_id
-      WHERE o.ship_date IS NOT NULL AND o.order_date IS NOT NULL;
+      WHERE o.ship_date IS NOT NULL AND o.order_date IS NOT NULL ${filterSql};
     `;
-    const result = await pool.query(tickerQuery);
-    res.json(result.rows[0]);
+    const result = await pool.query(tickerQuery, filterParams);
+    res.json(result.rows[0] || { gross_sales: 0, gross_profit: 0, avg_delivery_days: 0, total_shipping: 0 });
   } catch (err) {
      console.error(err);
      res.status(500).json({ error: err.message });

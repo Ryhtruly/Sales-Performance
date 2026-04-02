@@ -2,10 +2,10 @@ import axios from 'axios';
 
 const BASE = 'http://localhost:5000/api';
 
-export const fetchTicker = () => axios.get(`${BASE}/ticker`).then(r => r.data);
-export const fetchKpi = () => axios.get(`${BASE}/kpi`).then(r => r.data);
-export const fetchSales = () => axios.get(`${BASE}/sales`).then(r => r.data);
-export const fetchProducts = () => axios.get(`${BASE}/products`).then(r => r.data);
+export const fetchTicker = (params: any = {}) => axios.get(`${BASE}/ticker`, { params }).then(r => r.data);
+export const fetchKpi = (params: any = {}) => axios.get(`${BASE}/kpi`, { params }).then(r => r.data);
+export const fetchSales = (params: any = {}) => axios.get(`${BASE}/sales`, { params }).then(r => r.data);
+export const fetchProducts = (params: any = {}) => axios.get(`${BASE}/products`, { params }).then(r => r.data);
 
 export type TickerData = {
   gross_sales: number;
